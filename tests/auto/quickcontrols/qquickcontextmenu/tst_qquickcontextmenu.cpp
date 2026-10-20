@@ -7,8 +7,10 @@
 #include <QtTest/qsignalspy.h>
 #include <QtTest/qtest.h>
 #include <QtQuick/qquickview.h>
+#include <QtQuick/private/qquickdeliveryagent_p_p.h>
 #include <QtQuick/private/qquickmousearea_p.h>
 #include <QtQuick/private/qquicktaphandler_p.h>
+#include <QtQuick/private/qquickwindow_p.h>
 #include <QtQuickTestUtils/private/viewtestutils_p.h>
 #include <QtQuickTestUtils/private/visualtestutils_p.h>
 #include <QtQuickControlsTestUtils/private/controlstestutils_p.h>
@@ -49,6 +51,7 @@ private slots:
     void explicitMenuPreventsBuiltInMenu();
     void menuItemShouldntTriggerOnRelease();
     void textControlsMenuKey();
+    void mouseContextMenuAtOriginWithNoFocus();
     void mouseAreaUnderTextArea();
     void textEditingContextMenuUndoRedo_data();
     void textEditingContextMenuUndoRedo();
@@ -479,6 +482,28 @@ void tst_QQuickContextMenu::textControlsMenuKey()
             textField->cursorRectangle().center().toPoint()));
         openMenu->close();
     }
+}
+
+void tst_QQuickContextMenu::mouseContextMenuAtOriginWithNoFocus()
+{
+#ifdef Q_OS_ANDROID
+    QSKIP("Crashes on android. See QTBUG-139400");
+#endif
+    QQuickApplicationHelper helper(this, "textControlsAndParentMenus.qml");
+    QVERIFY2(helper.ready, helper.failureMessage());
+    QQuickWindow *window = helper.window;
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window));
+
+    // The crash does not need a focus item. A layer-shell panel stays in
+    // this state for its whole lifetime.
+    auto *da = QQuickWindowPrivate::get(window)->deliveryAgentPrivate();
+    QVERIFY(da);
+    da->activeFocusItem = nullptr;
+
+    QContextMenuEvent cme(QContextMenuEvent::Mouse, QPoint(), window->mapToGlobal(QPoint()));
+    QGuiApplication::sendEvent(window, &cme);
+    QCOMPARE(window->activeFocusItem(), nullptr);
 }
 
 void tst_QQuickContextMenu::mouseAreaUnderTextArea()

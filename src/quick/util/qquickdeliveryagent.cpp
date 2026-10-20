@@ -3267,8 +3267,14 @@ QList<QQuickItem *> QQuickDeliveryAgentPrivate::contextMenuTargets(QQuickItem *i
         return std::nullopt;
     };
 
-    const auto pos = event->pos().isNull() ? activeFocusItem->mapToScene({}).toPoint() : event->pos();
-    if (event->pos().isNull())
+    // A mouse event at (0, 0) is a real position; QPoint::isNull() cannot
+    // tell it from a keyboard menu event. activeFocusItem is null when the
+    // window has no key focus (QTBUG-146671).
+    const bool unpositioned = event->reason() != QContextMenuEvent::Mouse && event->pos().isNull();
+    const auto pos = unpositioned && activeFocusItem
+            ? activeFocusItem->mapToScene({}).toPoint()
+            : event->pos();
+    if (unpositioned)
         qCDebug(lcContextMenu) << "for QContextMenuEvent, active focus item is" << activeFocusItem << "@" << pos;
     return eventTargets(item, event, -1, pos, pos, predicate);
 }
