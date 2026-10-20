@@ -526,6 +526,16 @@ void tst_QQuickContextMenu::mouseContextMenuAtOrigin()
         TRY_VERIFY_POPUP_OPENED(windowMenu);
         QCOMPARE(windowMenu->position(), QPointF());
         windowMenu->close();
+        QTRY_VERIFY(!windowMenu->isOpened());
+    }
+
+    // Only a non-mouse event reaches mapToScene. This is the null check.
+    {
+        QContextMenuEvent cme(QContextMenuEvent::Keyboard, QPoint(), window->mapToGlobal(QPoint()));
+        QGuiApplication::sendEvent(window, &cme);
+        TRY_VERIFY_POPUP_OPENED(windowMenu);
+        QCOMPARE(windowMenu->position(), QPointF());
+        windowMenu->close();
     }
 }
 
