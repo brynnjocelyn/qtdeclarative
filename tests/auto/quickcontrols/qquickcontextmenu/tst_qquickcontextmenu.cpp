@@ -51,7 +51,7 @@ private slots:
     void explicitMenuPreventsBuiltInMenu();
     void menuItemShouldntTriggerOnRelease();
     void textControlsMenuKey();
-    void mouseContextMenuAtOriginWithNoFocus();
+    void mouseContextMenuAtOrigin();
     void mouseAreaUnderTextArea();
     void textEditingContextMenuUndoRedo_data();
     void textEditingContextMenuUndoRedo();
@@ -484,7 +484,7 @@ void tst_QQuickContextMenu::textControlsMenuKey()
     }
 }
 
-void tst_QQuickContextMenu::mouseContextMenuAtOriginWithNoFocus()
+void tst_QQuickContextMenu::mouseContextMenuAtOrigin()
 {
 #ifdef Q_OS_ANDROID
     QSKIP("Crashes on android. See QTBUG-139400");
@@ -495,15 +495,38 @@ void tst_QQuickContextMenu::mouseContextMenuAtOriginWithNoFocus()
     window->show();
     QVERIFY(QTest::qWaitForWindowExposed(window));
 
-    // The crash does not need a focus item. A layer-shell panel stays in
-    // this state for its whole lifetime.
+    auto *textArea = window->findChild<QQuickTextArea *>("textArea");
+    QVERIFY(textArea);
+    auto *windowMenu = window->findChild<QQuickMenu *>("windowMenu");
+    QVERIFY(windowMenu);
+
+    // (0, 0) is a real mouse position, so a focused control must not take it.
+    window->requestActivate();
+    textArea->forceActiveFocus();
+    QTRY_VERIFY(window->activeFocusItem());
+    {
+        QContextMenuEvent cme(QContextMenuEvent::Mouse, QPoint(), window->mapToGlobal(QPoint()));
+        QGuiApplication::sendEvent(window, &cme);
+        TRY_VERIFY_POPUP_OPENED(windowMenu);
+        QCOMPARE(windowMenu->position(), QPointF());
+        auto *textMenu = textArea->findChild<QQuickMenu *>();
+        QVERIFY(!textMenu || !textMenu->isOpened());
+        windowMenu->close();
+        QTRY_VERIFY(!windowMenu->isOpened());
+    }
+
+    // A window that never takes key focus leaves this pointer null.
+    // setFocus(false) moves focus to the scope instead of clearing it.
     auto *da = QQuickWindowPrivate::get(window)->deliveryAgentPrivate();
     QVERIFY(da);
     da->activeFocusItem = nullptr;
-
-    QContextMenuEvent cme(QContextMenuEvent::Mouse, QPoint(), window->mapToGlobal(QPoint()));
-    QGuiApplication::sendEvent(window, &cme);
-    QCOMPARE(window->activeFocusItem(), nullptr);
+    {
+        QContextMenuEvent cme(QContextMenuEvent::Mouse, QPoint(), window->mapToGlobal(QPoint()));
+        QGuiApplication::sendEvent(window, &cme);
+        TRY_VERIFY_POPUP_OPENED(windowMenu);
+        QCOMPARE(windowMenu->position(), QPointF());
+        windowMenu->close();
+    }
 }
 
 void tst_QQuickContextMenu::mouseAreaUnderTextArea()
